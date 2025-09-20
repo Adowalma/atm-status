@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MonitorATM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <!-- Header -->
+  <header class="bg-blue-600 text-white p-4 shadow-md">
+    <h1 class="text-xl font-bold">MonitorATM</h1>
+    <p class="text-sm">Status colaborativo de ATMs - Área Central</p>
+  </header>
+
+  <!-- Navegação -->
+  <nav class="bg-white shadow-sm flex justify-around">
+    <button onclick="showPage('home')" class="py-2 px-4 hover:bg-gray-100">Home</button>
+    <button onclick="showPage('update')" class="py-2 px-4 hover:bg-gray-100">Atualizar</button>
+    <button onclick="showPage('history')" class="py-2 px-4 hover:bg-gray-100">Histórico</button>
+  </nav>
+
+  <!-- Home Page -->
+  <main id="home" class="page p-4 space-y-4">
+    <h2 class="text-lg font-semibold">Status dos ATMs</h2>
+    <div id="atm-list" class="space-y-3"></div>
+  </main>
+
+  <!-- Update Page -->
+  <main id="update" class="page hidden p-4 space-y-4">
+    <h2 class="text-lg font-semibold">Atualizar Status</h2>
+    <form id="statusForm" class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium mb-1">ATM</label>
+        <select name="atm" class="w-full border p-2 rounded" required>
+          <option value="">Selecione o ATM</option>
+          <option value="ATM 01">ATM 01</option>
+          <option value="ATM 02">ATM 02</option>
+          <option value="ATM 03">ATM 03</option>
+          <option value="ATM 04">ATM 04</option>
+          <option value="ATM 05">ATM 05</option>
+          <option value="ATM 06">ATM 06</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Status</label>
+        <select name="status" class="w-full border p-2 rounded" required>
+          <option value="">Selecione o status</option>
+          <option value="disponível">Disponível</option>
+          <option value="sem dinheiro">Sem Dinheiro</option>
+          <option value="sem papel">Sem Papel</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Foto (opcional)</label>
+        <input type="file" accept="image/*" capture="camera" class="w-full border p-2 rounded" />
+      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        Enviar Atualização
+      </button>
+    </form>
+  </main>
+
+  <!-- History Page -->
+  <main id="history" class="page hidden p-4 space-y-4">
+    <h2 class="text-lg font-semibold">Histórico de Atualizações</h2>
+    <ul id="historyList" class="space-y-2 text-sm"></ul>
+  </main>
+
+  <script>
+    const atmDataKey = 'atmStatusData';
+    const historyKey = 'atmHistory';
+
+    function getStoredData(key) {
+      return JSON.parse(localStorage.getItem(key)) || [];
+    }
+
+    function saveData(key, data) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    function loadATMStatus() {
+      const atmList = document.getElementById('atm-list');
+      atmList.innerHTML = '';
+      const data = getStoredData(atmDataKey);
+
+      const defaultATMs = ['ATM 01', 'ATM 02', 'ATM 03', 'ATM 04', 'ATM 05', 'ATM 06'];
+      defaultATMs.forEach(atm => {
+        const status = data.find(item => item.atm === atm)?.status || 'desconhecido';
+        const color = {
+          'disponível': 'bg-green-100 text-green-800',
+          'sem dinheiro': 'bg-yellow-100 text-yellow-800',
+          'sem papel': 'bg-red-100 text-red-800',
+          'desconhecido': 'bg-gray-100 text-gray-600'
+        }[status];
+
+        const div = document.createElement('div');
+        div.className = 'p-3 rounded shadow-sm bg-white';
+        div.innerHTML = `
+          <div class="font-medium">${atm}</div>
+          <span class="text-xs px-2 py-1 rounded-full ${color}">${status}</span>
+        `;
+        atmList.appendChild(div);
+      });
+    }
+
+    function loadHistory() {
+      const historyList = document.getElementById('historyList');
+      const history = getStoredData(historyKey);
+      historyList.innerHTML = '';
+
+      if (history.length === 0) {
+        historyList.innerHTML = '<li class="text-gray-500">Nenhuma atualização registrada.</li>';
+        return;
+      }
+
+      history.slice(-10).reverse().forEach(entry => {
+        const li = document.createElement('li');
+        li.className = 'p-2 bg-white rounded shadow-sm';
+        li.textContent = `${entry.atm} - ${entry.status} (${entry.time})`;
+        historyList.appendChild(li);
+      });
+    }
+
+    document.getElementById('statusForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const atm = formData.get('atm');
+      const status = formData.get('status');
+
+      const data = getStoredData(atmDataKey);
+      const index = data.findIndex(item => item.atm === atm);
+
+      const time = new Date().toLocaleString();
+
+      if (index !== -1) {
+        data[index].status = status;
+        data[index].time = time;
+      } else {
+        data.push({ atm, status, time });
+      }
+
+      saveData(atmDataKey, data);
+
+      const history = getStoredData(historyKey);
+      history.push({ atm, status, time });
+      saveData(historyKey, history);
+
+      this.reset();
+      alert('Status atualizado!');
+      showPage('home');
+      loadATMStatus();
+    });
+
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById(pageId).classList.remove('hidden');
+    }
+
+    // Inicialização
+    loadATMStatus();
+    loadHistory();
+  </script>
+
+</body>
+</html>

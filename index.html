@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATM Watch - Monitoramento Colaborativo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .status-available {
+            background-color: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+        }
+        .status-no-cash {
+            background-color: rgba(234, 179, 8, 0.1);
+            border-left: 4px solid #eab308;
+        }
+        .status-unavailable {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+        }
+        .map-container {
+            height: 300px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="%23e5e7eb" stroke-width="0.5"><rect width="100" height="100"/><line x1="0" y1="20" x2="100" y2="20"/><line x1="0" y1="40" x2="100" y2="40"/><line x1="0" y1="60" x2="100" y2="60"/><line x1="0" y1="80" x2="100" y2="80"/><line x1="20" y1="0" x2="20" y2="100"/><line x1="40" y1="0" x2="40" y2="100"/><line x1="60" y1="0" x2="60" y2="100"/><line x1="80" y1="0" x2="80" y2="100"/></svg>');
+            background-size: 20px 20px;
+        }
+        .photo-preview {
+            transition: all 0.3s ease;
+        }
+        .photo-preview:hover {
+            transform: scale(1.05);
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-md">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-money-bill-wave text-2xl"></i>
+                    <h1 class="text-xl font-bold">ATM Watch</h1>
+                </div>
+                <button id="menu-btn" class="md:hidden focus:outline-none">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <nav class="hidden md:flex space-x-6">
+                    <a href="#" class="hover:text-blue-200 font-medium">Mapa</a>
+                    <a href="#" class="hover:text-blue-200 font-medium">Relatórios</a>
+                    <a href="#" class="hover:text-blue-200 font-medium">Sobre</a>
+                </nav>
+            </div>
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden md:hidden bg-blue-700 px-4 py-2">
+                <a href="#" class="block py-2 hover:text-blue-200">Mapa</a>
+                <a href="#" class="block py-2 hover:text-blue-200">Relatórios</a>
+                <a href="#" class="block py-2 hover:text-blue-200">Sobre</a>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Left Column (Map and Status) -->
+                <div class="md:w-2/3">
+                    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-semibold text-gray-800">Mapa de ATMs</h2>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm text-gray-600">Atualizado: <span id="last-update">há 15 minutos</span></span>
+                                <button class="text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="map-container rounded-lg relative">
+                            <!-- Placeholder for map -->
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="text-center text-gray-500">
+                                    <i class="fas fa-map-marked-alt text-4xl mb-2"></i>
+                                    <p>Carregando mapa...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- ATM markers (simulated) -->
+                            <div class="absolute top-1/4 left-1/4">
+                                <div class="relative">
+                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-green-600 transition" title="ATM 1 - Disponível">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="absolute top-1/3 right-1/3">
+                                <div class="relative">
+                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-yellow-600 transition" title="ATM 2 - Sem dinheiro">
+                                        <i class="fas fa-exclamation"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-1/4 right-1/4">
+                                <div class="relative">
+                                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-red-600 transition" title="ATM 3 - Indisponível">
+                                        <i class="fas fa-times"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Status Recentes</h2>
+                        <div class="space-y-3">
+                            <!-- Status Item 1 -->
+                            <div class="p-3 rounded-lg status-available flex items-start">
+                                <div class="mr-3 mt-1">
+                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="font-medium text-gray-800">ATM Banco Central - Centro</h3>
+                                        <span class="text-xs text-gray-500">há 30 min</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">Disponível para saque</p>
+                                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                                        <i class="fas fa-user mr-1"></i>
+                                        <span>Relatado por: João S.</span>
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                        <span>3 confirmações</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Status Item 2 -->
+                            <div class="p-3 rounded-lg status-no-cash flex items-start">
+                                <div class="mr-3 mt-1">
+                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white">
+                                        <i class="fas fa-exclamation"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="font-medium text-gray-800">ATM Popular - Vila Nova</h3>
+                                        <span class="text-xs text-gray-500">há 1h</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">Sem dinheiro disponível</p>
+                                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                                        <i class="fas fa-user mr-1"></i>
+                                        <span>Relatado por: Maria L.</span>
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                        <span>5 confirmações</span>
+                                    </div>
+                                    <div class="mt-2 flex space-x-2">
+                                        <div class="photo-preview w-16 h-16 bg-gray-200 rounded overflow-hidden cursor-pointer">
+                                            <img src="https://via.placeholder.com/100?text=Prova" alt="Prova" class="w-full h-full object-cover">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Status Item 3 -->
+                            <div class="p-3 rounded-lg status-unavailable flex items-start">
+                                <div class="mr-3 mt-1">
+                                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white">
+                                        <i class="fas fa-times"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-start">
+                                        <h3 class="font-medium text-gray-800">ATM Express - Jardim</h3>
+                                        <span class="text-xs text-gray-500">há 2h</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">Fora de serviço</p>
+                                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                                        <i class="fas fa-user mr-1"></i>
+                                        <span>Relatado por: Carlos R.</span>
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                        <span>2 confirmações</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
+                            Ver mais atualizações
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column (Report and Stats) -->
+                <div class="md:w-1/3">
+                    <div class="bg-white rounded-lg shadow-md p-4 mb-6 sticky top-4">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Reportar Status</h2>
+                        <form id="report-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Localização do ATM</label>
+                                <div class="relative">
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nome ou endereço do ATM" required>
+                                    <button type="button" class="absolute right-2 top-2 text-gray-500 hover:text-blue-600">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="available">
+                                        <div class="w-6 h-6 bg-green-500 rounded-full mb-1"></div>
+                                        <span class="text-xs">Disponível</span>
+                                    </button>
+                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="no-cash">
+                                        <div class="w-6 h-6 bg-yellow-500 rounded-full mb-1"></div>
+                                        <span class="text-xs">Sem dinheiro</span>
+                                    </button>
+                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="unavailable">
+                                        <div class="w-6 h-6 bg-red-500 rounded-full mb-1"></div>
+                                        <span class="text-xs">Indisponível</span>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="status" id="status-input" required>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Adicionar evidência (opcional)</label>
+                                <div class="flex items-center space-x-2">
+                                    <label for="photo-upload" class="cursor-pointer bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 transition">
+                                        <i class="fas fa-camera mr-1"></i> Tirar foto
+                                    </label>
+                                    <input type="file" id="photo-upload" accept="image/*" capture="environment" class="hidden">
+                                    <span class="text-xs text-gray-500">ou selecione</span>
+                                </div>
+                                <div id="photo-preview" class="mt-2 flex flex-wrap gap-2 hidden">
+                                    <!-- Photo previews will appear here -->
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Observações (opcional)</label>
+                                <textarea class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="2" placeholder="Ex: Cartão preso, tela quebrada..."></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition flex items-center justify-center">
+                                <i class="fas fa-paper-plane mr-2"></i> Enviar Relatório
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-md p-4">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Estatísticas da Comunidade</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">ATMs monitorados</span>
+                                    <span class="text-sm font-bold">42</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full" style="width: 100%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Disponíveis agora</span>
+                                    <span class="text-sm font-bold">28</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full" style="width: 67%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Sem dinheiro</span>
+                                    <span class="text-sm font-bold">8</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 19%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-700">Indisponíveis</span>
+                                    <span class="text-sm font-bold">6</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-red-500 h-2 rounded-full" style="width: 14%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Colaboradores ativos hoje</h3>
+                            <div class="flex items-center">
+                                <div class="flex -space-x-2">
+                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/women/44.jpg" alt="User">
+                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/men/32.jpg" alt="User">
+                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/women/68.jpg" alt="User">
+                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/men/75.jpg" alt="User">
+                                </div>
+                                <span class="ml-2 text-sm text-gray-600">+17 outros</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 p-3 bg-blue-50 rounded-lg">
+                            <h3 class="text-sm font-medium text-blue-800 mb-1 flex items-center">
+                                <i class="fas fa-info-circle mr-1"></i> Como funciona?
+                            </h3>
+                            <p class="text-xs text-blue-700">
+                                ATM Watch é uma plataforma colaborativa onde usuários como você reportam o status dos caixas eletrônicos. Sua contribuição ajuda toda a comunidade!
+                            </p>
+                            <button class="mt-2 text-xs text-blue-600 font-medium hover:underline">
+                                Saiba mais <i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-6">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="mb-4 md:mb-0">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-money-bill-wave text-xl"></i>
+                            <span class="font-bold">ATM Watch</span>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-1">Monitoramento colaborativo de caixas eletrônicos</p>
+                    </div>
+                    <div class="flex space-x-6">
+                        <a href="#" class="text-gray-400 hover:text-white transition">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="mt-6 pt-6 border-t border-gray-700 text-center text-sm text-gray-400">
+                    <p>© 2023 ATM Watch. Projeto independente sem fins lucrativos.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal for photo preview -->
+    <div id="photo-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg max-w-4xl w-full mx-4 relative">
+            <button id="close-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+            <div class="p-4">
+                <img id="modal-image" src="" alt="Foto do ATM" class="w-full h-auto max-h-[70vh] object-contain">
+            </div>
+        </div>
+    </div>
+
+    <!-- Success notification -->
+    <div id="success-notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center hidden">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span>Relatado enviado com sucesso!</span>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('menu-btn').addEventListener('click', function() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        });
+
+        // Status selection
+        const statusOptions = document.querySelectorAll('.status-option');
+        const statusInput = document.getElementById('status-input');
+        
+        statusOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove active class from all options
+                statusOptions.forEach(opt => {
+                    opt.classList.remove('bg-blue-50', 'border-blue-300');
+                });
+                
+                // Add active class to clicked option
+                this.classList.add('bg-blue-50', 'border-blue-300');
+                
+                // Set the hidden input value
+                statusInput.value = this.dataset.status;
+            });
+        });
+
+        // Photo upload preview
+        const photoUpload = document.getElementById('photo-upload');
+        const photoPreview = document.getElementById('photo-preview');
+        
+        photoUpload.addEventListener('change', function(e) {
+            photoPreview.innerHTML = '';
+            photoPreview.classList.remove('hidden');
+            
+            Array.from(e.target.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'photo-preview relative w-16 h-16 bg-gray-200 rounded overflow-hidden cursor-pointer';
+                    
+                    const img = document.createElement('img');
+                    img.src = event.target.result;
+                    img.className = 'w-full h-full object-cover';
+                    img.alt = 'Preview';
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs';
+                    removeBtn.innerHTML = '×';
+                    removeBtn.addEventListener('click', function() {
+                        previewDiv.remove();
+                        if (photoPreview.children.length === 0) {
+                            photoPreview.classList.add('hidden');
+                        }
+                    });
+                    
+                    previewDiv.appendChild(img);
+                    previewDiv.appendChild(removeBtn);
+                    photoPreview.appendChild(previewDiv);
+                    
+                    // Add click event to show modal
+                    previewDiv.addEventListener('click', function() {
+                        const modal = document.getElementById('photo-modal');
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = event.target.result;
+                        modal.classList.remove('hidden');
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        // Close modal
+        document.getElementById('close-modal').addEventListener('click', function() {
+            document.getElementById('photo-modal').classList.add('hidden');
+        });
+
+        // Form submission
+        document.getElementById('report-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Simulate form submission
+            const notification = document.getElementById('success-notification');
+            notification.classList.remove('hidden');
+            
+            // Reset form
+            this.reset();
+            photoPreview.innerHTML = '';
+            photoPreview.classList.add('hidden');
+            statusOptions.forEach(opt => {
+                opt.classList.remove('bg-blue-50', 'border-blue-300');
+            });
+            statusInput.value = '';
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 3000);
+        });
+
+        // Simulate loading
+        setTimeout(() => {
+            const lastUpdate = document.getElementById('last-update');
+            lastUpdate.textContent = 'agora mesmo';
+            lastUpdate.classList.add('text-green-600', 'font-medium');
+        }, 1500);
+    </script>
+</body>
+</html>

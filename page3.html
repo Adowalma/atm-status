@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ATM Status - Comunidade</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/feather-icons"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .status-pill {
+      @apply inline-block px-3 py-1 rounded-full text-sm font-semibold;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Modal de Login -->
+  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-80">
+      <h3 class="text-xl font-bold mb-4">Login</h3>
+      <input id="loginPassword" type="password" placeholder="Senha" class="w-full border rounded p-2 mb-4">
+      <button onclick="login()" class="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700">Entrar</button>
+    </div>
+  </div>
+
+  <!-- Navegação -->
+  <header class="bg-blue-600 text-white p-4 shadow-md">
+    <div class="container mx-auto flex justify-between items-center">
+      <h1 class="text-xl font-bold flex items-center">
+        <i data-feather="credit-card" class="mr-2"></i> ATM Status
+      </h1>
+      <nav>
+        <a href="#" id="nav-home" class="mx-2 text-white hover:underline">Início</a>
+        <a href="#" id="nav-update" class="mx-2 text-white hover:underline">Atualizar</a>
+        <a href="#" id="nav-history" class="mx-2 text-white hover:underline">Histórico</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Conteúdo Dinâmico -->
+  <main class="flex-1 container mx-auto p-4" id="app">
+    <!-- Página Inicial -->
+    <div id="page-home" class="page">
+      <h2 class="text-2xl font-semibold mb-4 flex items-center">
+        <i data-feather="home" class="mr-2"></i> Status dos ATMs
+      </h2>
+      <div id="atm-list" class="space-y-4"></div>
+    </div>
+
+    <!-- Página de Atualização -->
+    <div id="page-update" class="page hidden">
+      <h2 class="text-2xl font-semibold mb-4 flex items-center">
+        <i data-feather="edit" class="mr-2"></i> Atualizar Status
+      </h2>
+      <form id="update-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Selecione o ATM:</label>
+          <select id="atm-select" class="w-full border rounded p-2" required>
+            <!-- ATMs serão populados aqui -->
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Status:</label>
+          <select id="status-select" class="w-full border rounded p-2" required>
+            <option value="available">Disponível</option>
+            <option value="out_of_cash">Sem dinheiro</option>
+            <option value="unavailable">Indisponível</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Foto (opcional):</label>
+          <input type="file" accept="image/*" id="photo-input" class="w-full border rounded p-2">
+        </div>
+        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center">
+          <i data-feather="send" class="mr-2"></i> Enviar Atualização
+        </button>
+      </form>
+    </div>
+
+    <!-- Página de Histórico -->
+    <div id="page-history" class="page hidden">
+      <h2 class="text-2xl font-semibold mb-4 flex items-center">
+        <i data-feather="clock" class="mr-2"></i> Histórico de Atualizações
+      </h2>
+      <div id="history-list" class="space-y-3"></div>
+    </div>
+  </main>
+
+  <footer class="bg-gray-200 p-4 text-center text-sm text-gray-600">
+    &copy; 2025 ATM Status - Comunidade
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    const ATMS = [
+      { id: 'atm1', name: 'ATM Central' },
+      { id: 'atm2', name: 'ATM Shopping' },
+      { id: 'atm3', name: 'ATM Praça' },
+      { id: 'atm4', name: 'ATM Estação' },
+      { id: 'atm5', name: 'ATM Hospital' },
+      { id: 'atm6', name: 'ATM Mercado' }
+    ];
+
+    const STATUS_LABELS = {
+      available: 'Disponível',
+      out_of_cash: 'Sem dinheiro',
+      unavailable: 'Indisponível'
+    };
+
+    const STATUS_COLORS = {
+      available: 'bg-green-100 text-green-800',
+      out_of_cash: 'bg-yellow-100 text-yellow-800',
+      unavailable: 'bg-red-100 text-red-800'
+    };
+
+    let isAuthenticated = false;
+
+    function initStorage() {
+      ATMS.forEach(atm => {
+        if (!localStorage.getItem(atm.id)) {
+          localStorage.setItem(atm.id, JSON.stringify({
+            status: 'available',
+            timestamp: Date.now(),
+            history: [{ status: 'available', timestamp: Date.now(), photo: null }]
+          }));
+        }
+      });
+    }
+
+    function renderATMs() {
+      const container = document.getElementById('atm-list');
+      container.innerHTML = '';
+      ATMS.forEach(atm => {
+        const data = JSON.parse(localStorage.getItem(atm.id));
+        const status = data.status;
+        const time = new Date(data.timestamp).toLocaleTimeString();
+
+        const div = document.createElement('div');
+        div.className = 'bg-white shadow p-4 rounded-lg';
+
+        div.innerHTML = `
+          <h3 class="font-semibold text-lg flex items-center">
+            <i data-feather="circle" class="${status === 'available' ? 'text-green-500' : status === 'out_of_cash' ? 'text-yellow-500' : 'text-red-500'} mr-2"></i>
+            ${atm.name}
+          </h3>
+          <p class="text-sm text-gray-500">Última atualização: ${time}</p>
+          <span class="status-pill ${STATUS_COLORS[status]}">${STATUS_LABELS[status]}</span>
+        `;
+        container.appendChild(div);
+      });
+      feather.replace();
+    }
+
+    function populateATMSelect() {
+      const select = document.getElementById('atm-select');
+      ATMS.forEach(atm => {
+        const option = document.createElement('option');
+        option.value = atm.id;
+        option.textContent = atm.name;
+        select.appendChild(option);
+      });
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('history-list');
+      container.innerHTML = '';
+      ATMS.forEach(atm => {
+        const data = JSON.parse(localStorage.getItem(atm.id));
+        data.history.forEach(entry => {
+          const time = new Date(entry.timestamp).toLocaleString();
+          const div = document.createElement('div');
+          div.className = 'bg-white shadow p-3 rounded';
+          div.innerHTML = `
+            <p><strong>${atm.name}</strong> - ${STATUS_LABELS[entry.status]} às ${time}</p>
+          `;
+          container.appendChild(div);
+        });
+      });
+    }
+
+    document.getElementById('update-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!isAuthenticated) {
+        alert('Você precisa estar autenticado para atualizar.');
+        return;
+      }
+      const atmId = document.getElementById('atm-select').value;
+      const status = document.getElementById('status-select').value;
+
+      const data = JSON.parse(localStorage.getItem(atmId));
+      data.status = status;
+      data.timestamp = Date.now();
+      data.history.push({ status, timestamp: Date.now(), photo: null });
+
+      localStorage.setItem(atmId, JSON.stringify(data));
+      alert('Status atualizado com sucesso!');
+      renderATMs();
+      renderHistory();
+    });
+
+    document.getElementById('nav-home').addEventListener('click', () => showPage('page-home'));
+    document.getElementById('nav-update').addEventListener('click', () => showPage('page-update'));
+    document.getElementById('nav-history').addEventListener('click', () => showPage('page-history'));
+
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById(pageId).classList.remove('hidden');
+      if (pageId === 'page-home') renderATMs();
+      if (pageId === 'page-history') {
+        if (!isAuthenticated) {
+          alert('Você precisa estar autenticado para ver o histórico.');
+          showPage('page-home');
+        } else {
+          renderHistory();
+        }
+      }
+    }
+
+    function login() {
+      const password = document.getElementById('loginPassword').value;
+      if (password === 'seguranca123') {
+        isAuthenticated = true;
+        document.getElementById('loginModal').classList.add('hidden');
+      } else {
+        alert('Senha incorreta.');
+      }
+    }
+
+    // Inicialização
+    initStorage();
+    populateATMSelect();
+    renderATMs();
+    feather.replace();
+  </script>
+</body>
+</html>
