@@ -1,487 +1,656 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="bg-gray-100">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATM Watch - Monitoramento Colaborativo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .status-available {
-            background-color: rgba(34, 197, 94, 0.1);
-            border-left: 4px solid #22c55e;
-        }
-        .status-no-cash {
-            background-color: rgba(234, 179, 8, 0.1);
-            border-left: 4px solid #eab308;
-        }
-        .status-unavailable {
-            background-color: rgba(239, 68, 68, 0.1);
-            border-left: 4px solid #ef4444;
-        }
-        .map-container {
-            height: 300px;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="%23e5e7eb" stroke-width="0.5"><rect width="100" height="100"/><line x1="0" y1="20" x2="100" y2="20"/><line x1="0" y1="40" x2="100" y2="40"/><line x1="0" y1="60" x2="100" y2="60"/><line x1="0" y1="80" x2="100" y2="80"/><line x1="20" y1="0" x2="20" y2="100"/><line x1="40" y1="0" x2="40" y2="100"/><line x1="60" y1="0" x2="60" y2="100"/><line x1="80" y1="0" x2="80" y2="100"/></svg>');
-            background-size: 20px 20px;
-        }
-        .photo-preview {
-            transition: all 0.3s ease;
-        }
-        .photo-preview:hover {
-            transform: scale(1.05);
-        }
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sequele Banks</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet (mapas) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .modal-bg { backdrop-filter: blur(4px); }
+    .leaflet-container { border-radius: 0.5rem; height:100%; }
+    .chip { @apply px-3 py-1 rounded-full text-sm font-semibold; }
+    /* small helper for hidden when printing dev UI */
+    @media print { header, footer, #toast { display: none; } }
+  </style>
 </head>
-<body class="bg-gray-50 font-sans">
-    <div class="min-h-screen flex flex-col">
-        <!-- Header -->
-        <header class="bg-blue-600 text-white shadow-md">
-            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <i class="fas fa-money-bill-wave text-2xl"></i>
-                    <h1 class="text-xl font-bold">ATM Watch</h1>
-                </div>
-                <button id="menu-btn" class="md:hidden focus:outline-none">
-                    <i class="fas fa-bars text-xl"></i>
-                </button>
-                <nav class="hidden md:flex space-x-6">
-                    <a href="#" class="hover:text-blue-200 font-medium">Mapa</a>
-                    <a href="#" class="hover:text-blue-200 font-medium">Relatórios</a>
-                    <a href="#" class="hover:text-blue-200 font-medium">Sobre</a>
-                </nav>
-            </div>
-            <!-- Mobile menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-blue-700 px-4 py-2">
-                <a href="#" class="block py-2 hover:text-blue-200">Mapa</a>
-                <a href="#" class="block py-2 hover:text-blue-200">Relatórios</a>
-                <a href="#" class="block py-2 hover:text-blue-200">Sobre</a>
-            </div>
-        </header>
+<body class="min-h-screen flex flex-col text-slate-800">
 
-        <!-- Main Content -->
-        <main class="flex-grow container mx-auto px-4 py-6">
-            <div class="flex flex-col md:flex-row gap-6">
-                <!-- Left Column (Map and Status) -->
-                <div class="md:w-2/3">
-                    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-semibold text-gray-800">Mapa de ATMs</h2>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-sm text-gray-600">Atualizado: <span id="last-update">há 15 minutos</span></span>
-                                <button class="text-blue-600 hover:text-blue-800">
-                                    <i class="fas fa-sync-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="map-container rounded-lg relative">
-                            <!-- Placeholder for map -->
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-center text-gray-500">
-                                    <i class="fas fa-map-marked-alt text-4xl mb-2"></i>
-                                    <p>Carregando mapa...</p>
-                                </div>
-                            </div>
-                            
-                            <!-- ATM markers (simulated) -->
-                            <div class="absolute top-1/4 left-1/4">
-                                <div class="relative">
-                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-green-600 transition" title="ATM 1 - Disponível">
-                                        <i class="fas fa-money-bill-wave"></i>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="absolute top-1/3 right-1/3">
-                                <div class="relative">
-                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-yellow-600 transition" title="ATM 2 - Sem dinheiro">
-                                        <i class="fas fa-exclamation"></i>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="absolute bottom-1/4 right-1/4">
-                                <div class="relative">
-                                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-red-600 transition" title="ATM 3 - Indisponível">
-                                        <i class="fas fa-times"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow-md p-4">
-                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Status Recentes</h2>
-                        <div class="space-y-3">
-                            <!-- Status Item 1 -->
-                            <div class="p-3 rounded-lg status-available flex items-start">
-                                <div class="mr-3 mt-1">
-                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">
-                                        <i class="fas fa-check"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow">
-                                    <div class="flex justify-between items-start">
-                                        <h3 class="font-medium text-gray-800">ATM Banco Central - Centro</h3>
-                                        <span class="text-xs text-gray-500">há 30 min</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600">Disponível para saque</p>
-                                    <div class="mt-2 flex items-center text-xs text-gray-500">
-                                        <i class="fas fa-user mr-1"></i>
-                                        <span>Relatado por: João S.</span>
-                                        <span class="mx-2">•</span>
-                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                                        <span>3 confirmações</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Status Item 2 -->
-                            <div class="p-3 rounded-lg status-no-cash flex items-start">
-                                <div class="mr-3 mt-1">
-                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white">
-                                        <i class="fas fa-exclamation"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow">
-                                    <div class="flex justify-between items-start">
-                                        <h3 class="font-medium text-gray-800">ATM Popular - Vila Nova</h3>
-                                        <span class="text-xs text-gray-500">há 1h</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600">Sem dinheiro disponível</p>
-                                    <div class="mt-2 flex items-center text-xs text-gray-500">
-                                        <i class="fas fa-user mr-1"></i>
-                                        <span>Relatado por: Maria L.</span>
-                                        <span class="mx-2">•</span>
-                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                                        <span>5 confirmações</span>
-                                    </div>
-                                    <div class="mt-2 flex space-x-2">
-                                        <div class="photo-preview w-16 h-16 bg-gray-200 rounded overflow-hidden cursor-pointer">
-                                            <img src="https://via.placeholder.com/100?text=Prova" alt="Prova" class="w-full h-full object-cover">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Status Item 3 -->
-                            <div class="p-3 rounded-lg status-unavailable flex items-start">
-                                <div class="mr-3 mt-1">
-                                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white">
-                                        <i class="fas fa-times"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow">
-                                    <div class="flex justify-between items-start">
-                                        <h3 class="font-medium text-gray-800">ATM Express - Jardim</h3>
-                                        <span class="text-xs text-gray-500">há 2h</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600">Fora de serviço</p>
-                                    <div class="mt-2 flex items-center text-xs text-gray-500">
-                                        <i class="fas fa-user mr-1"></i>
-                                        <span>Relatado por: Carlos R.</span>
-                                        <span class="mx-2">•</span>
-                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                                        <span>2 confirmações</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
-                            Ver mais atualizações
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Right Column (Report and Stats) -->
-                <div class="md:w-1/3">
-                    <div class="bg-white rounded-lg shadow-md p-4 mb-6 sticky top-4">
-                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Reportar Status</h2>
-                        <form id="report-form">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Localização do ATM</label>
-                                <div class="relative">
-                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nome ou endereço do ATM" required>
-                                    <button type="button" class="absolute right-2 top-2 text-gray-500 hover:text-blue-600">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                <div class="grid grid-cols-3 gap-2">
-                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="available">
-                                        <div class="w-6 h-6 bg-green-500 rounded-full mb-1"></div>
-                                        <span class="text-xs">Disponível</span>
-                                    </button>
-                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="no-cash">
-                                        <div class="w-6 h-6 bg-yellow-500 rounded-full mb-1"></div>
-                                        <span class="text-xs">Sem dinheiro</span>
-                                    </button>
-                                    <button type="button" class="status-option py-2 px-1 rounded-lg border border-gray-200 flex flex-col items-center hover:bg-gray-50" data-status="unavailable">
-                                        <div class="w-6 h-6 bg-red-500 rounded-full mb-1"></div>
-                                        <span class="text-xs">Indisponível</span>
-                                    </button>
-                                </div>
-                                <input type="hidden" name="status" id="status-input" required>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Adicionar evidência (opcional)</label>
-                                <div class="flex items-center space-x-2">
-                                    <label for="photo-upload" class="cursor-pointer bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 transition">
-                                        <i class="fas fa-camera mr-1"></i> Tirar foto
-                                    </label>
-                                    <input type="file" id="photo-upload" accept="image/*" capture="environment" class="hidden">
-                                    <span class="text-xs text-gray-500">ou selecione</span>
-                                </div>
-                                <div id="photo-preview" class="mt-2 flex flex-wrap gap-2 hidden">
-                                    <!-- Photo previews will appear here -->
-                                </div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Observações (opcional)</label>
-                                <textarea class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="2" placeholder="Ex: Cartão preso, tela quebrada..."></textarea>
-                            </div>
-
-                            <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition flex items-center justify-center">
-                                <i class="fas fa-paper-plane mr-2"></i> Enviar Relatório
-                            </button>
-                        </form>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow-md p-4">
-                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Estatísticas da Comunidade</h2>
-                        <div class="space-y-4">
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">ATMs monitorados</span>
-                                    <span class="text-sm font-bold">42</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-blue-600 h-2 rounded-full" style="width: 100%"></div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Disponíveis agora</span>
-                                    <span class="text-sm font-bold">28</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-green-500 h-2 rounded-full" style="width: 67%"></div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Sem dinheiro</span>
-                                    <span class="text-sm font-bold">8</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-yellow-500 h-2 rounded-full" style="width: 19%"></div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-sm font-medium text-gray-700">Indisponíveis</span>
-                                    <span class="text-sm font-bold">6</span>
-                                </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-red-500 h-2 rounded-full" style="width: 14%"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-6">
-                            <h3 class="text-sm font-medium text-gray-700 mb-2">Colaboradores ativos hoje</h3>
-                            <div class="flex items-center">
-                                <div class="flex -space-x-2">
-                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/women/44.jpg" alt="User">
-                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/men/32.jpg" alt="User">
-                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/women/68.jpg" alt="User">
-                                    <img class="w-8 h-8 rounded-full border-2 border-white" src="https://randomuser.me/api/portraits/men/75.jpg" alt="User">
-                                </div>
-                                <span class="ml-2 text-sm text-gray-600">+17 outros</span>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 p-3 bg-blue-50 rounded-lg">
-                            <h3 class="text-sm font-medium text-blue-800 mb-1 flex items-center">
-                                <i class="fas fa-info-circle mr-1"></i> Como funciona?
-                            </h3>
-                            <p class="text-xs text-blue-700">
-                                ATM Watch é uma plataforma colaborativa onde usuários como você reportam o status dos caixas eletrônicos. Sua contribuição ajuda toda a comunidade!
-                            </p>
-                            <button class="mt-2 text-xs text-blue-600 font-medium hover:underline">
-                                Saiba mais <i class="fas fa-chevron-right ml-1"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="bg-gray-800 text-white py-6">
-            <div class="container mx-auto px-4">
-                <div class="flex flex-col md:flex-row justify-between items-center">
-                    <div class="mb-4 md:mb-0">
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-money-bill-wave text-xl"></i>
-                            <span class="font-bold">ATM Watch</span>
-                        </div>
-                        <p class="text-sm text-gray-400 mt-1">Monitoramento colaborativo de caixas eletrônicos</p>
-                    </div>
-                    <div class="flex space-x-6">
-                        <a href="#" class="text-gray-400 hover:text-white transition">
-                            <i class="fab fa-twitter"></i>
-                        </a>
-                        <a href="#" class="text-gray-400 hover:text-white transition">
-                            <i class="fab fa-facebook"></i>
-                        </a>
-                        <a href="#" class="text-gray-400 hover:text-white transition">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                    </div>
-                </div>
-                <div class="mt-6 pt-6 border-t border-gray-700 text-center text-sm text-gray-400">
-                    <p>© 2023 ATM Watch. Projeto independente sem fins lucrativos.</p>
-                </div>
-            </div>
-        </footer>
-    </div>
-
-    <!-- Modal for photo preview -->
-    <div id="photo-modal" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center hidden">
-        <div class="bg-white rounded-lg max-w-4xl w-full mx-4 relative">
-            <button id="close-modal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times text-2xl"></i>
-            </button>
-            <div class="p-4">
-                <img id="modal-image" src="" alt="Foto do ATM" class="w-full h-auto max-h-[70vh] object-contain">
-            </div>
+  <!-- HEADER -->
+  <header class="bg-white border-b">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <svg  xmlns="http://www.w3.org/2000/svg"  width="36"  height="36"  viewBox="0 0 24 24"  fill="currentColor"  class="text-slate-700 icon icon-tabler icons-tabler-filled icon-tabler-cash-banknote"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19 5a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-14a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3zm-7 4a3 3 0 0 0 -2.996 2.85l-.004 .15a3 3 0 1 0 3 -3m6.01 2h-.01a1 1 0 0 0 0 2h.01a1 1 0 0 0 0 -2m-12 0h-.01a1 1 0 1 0 .01 2a1 1 0 0 0 0 -2" /></svg>
+        <div>
+          <h1 class="text-lg font-semibold">Sequele Banks</h1>
+          <div class="text-xs text-slate-500">Visão rápida</div>
         </div>
+      </div>
+
+      <nav class="flex items-center gap-3">
+        <button id="nav-home" class="px-3 py-2 rounded hover:bg-slate-50 text-sm" aria-label="Ir para Início">Início</button>
+        <button id="nav-update" class="px-3 py-2 rounded hover:bg-slate-50 text-sm" aria-label="Ir para Atualizar">Atualizar</button>
+        <button id="nav-history" class="px-3 py-2 rounded hover:bg-slate-50 text-sm" aria-label="Ir para Histórico">Histórico</button>
+
+        <div id="auth-block" class="flex items-center gap-3 ml-4">
+          <span id="welcome" class="text-sm text-slate-600 hidden" aria-live="polite"></span>
+          <button id="btn-login" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Login</button>
+          <button id="btn-logout" class="px-3 py-2 rounded border text-sm hidden">Sair</button>
+        </div>
+      </nav>
     </div>
+  </header>
 
-    <!-- Success notification -->
-    <div id="success-notification" class="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center hidden">
-        <i class="fas fa-check-circle mr-2"></i>
-        <span>Relatado enviado com sucesso!</span>
+  <!-- TOAST -->
+  <div id="toast" class="fixed top-6 right-6 hidden z-50 px-4 py-2 rounded shadow text-white" role="status" aria-live="polite"></div>
+
+  <!-- MAIN (SPA Sections) -->
+  <main class="flex-1 container mx-auto px-4 py-6">
+
+    <!-- HOME -->
+    <section id="page-home" class="">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-semibold">Status dos ATMs</h2>
+        <div class="flex items-center gap-2">
+          <input id="atm-search" type="text" placeholder="Buscar ATM ou caixa..." class="border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" aria-label="Buscar ATMs"/>
+          <button id="atm-search-clear" class="text-xs text-slate-500 px-2 py-1 rounded hover:bg-slate-100 hidden" title="Limpar busca">Limpar</button>
+        </div>
+      </div>
+
+      <div id="atm-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </section>
+
+    <!-- ATM DETAILS (single view) -->
+    <section id="page-atm" class="hidden">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h2 id="atm-title" class="text-2xl font-semibold"></h2>
+          <div id="atm-sub" class="text-sm text-slate-500"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="atm-back" class="px-3 py-2 rounded border text-sm">Voltar</button>
+          <a id="atm-open-gmaps" target="_blank" rel="noopener" class="px-3 py-2 rounded bg-indigo-50 text-indigo-700 text-sm hover:underline">Abrir no Google Maps</a>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6">
+        <!-- machines list -->
+        <div class="md:col-span-2 bg-white rounded-xl shadow p-4">
+          <h3 class="font-semibold mb-3">Caixas</h3>
+          <div id="machines-list" class="space-y-3"></div>
+        </div>
+
+        <!-- side panel: quick update -->
+        <aside class="bg-white rounded-xl shadow p-4">
+          <h3 class="font-semibold mb-3">Ações rápidas</h3>
+          <p class="text-sm text-slate-500 mb-3">Atualize o status de um caixa (requer login).</p>
+
+          <label class="block text-xs text-slate-600 mb-1">Caixa</label>
+          <select id="quick-machine" class="w-full rounded border p-2 text-sm mb-3"></select>
+
+          <label class="block text-xs text-slate-600 mb-1">Status</label>
+          <select id="quick-status" class="w-full rounded border p-2 text-sm mb-3">
+            <option value="available">✔️ Disponível</option>
+            <option value="out_of_cash">⚠️ Sem dinheiro</option>
+            <option value="unavailable">❌ Indisponível</option>
+          </select>
+
+          <div class="flex items-center gap-2">
+            <button id="quick-update" class="bg-green-600 text-white px-3 py-2 rounded text-sm">Atualizar</button>
+            <!-- <button id="quick-refresh" class="px-3 py-2 rounded border text-sm">Atualizar vista</button> -->
+          </div>
+          <div id="quick-feedback" class="mt-3 text-sm text-slate-500"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- UPDATE (protected) -->
+    <section id="page-update" class="hidden">
+      <div class="mb-6 flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">Atualizar Status</h2>
+        <p class="text-sm text-slate-500">Requer autenticação</p>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-6 max-w-full">
+        <form id="form-update" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">ATM</label>
+            <select id="select-atm" class="w-full rounded border p-2 text-sm" required></select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Caixa</label>
+            <select id="select-machine" class="w-full rounded border p-2 text-sm" required></select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
+            <select id="select-status" class="w-full rounded border p-2 text-sm">
+              <option value="available">✔️ Disponível</option>
+              <option value="out_of_cash">⚠️ Sem dinheiro</option>
+              <option value="unavailable">❌ Indisponível</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Foto (opcional)</label>
+            <input id="input-photo" type="file" accept="image/*" class="text-sm w-full" />
+            <!-- <p class="text-xs text-slate-400 mt-1">A foto será guardada em base64 com a atualização.</p> -->
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button id="btn-submit-update" class="bg-green-600 text-white px-4 py-2 rounded text-sm" type="submit">Enviar</button>
+            <button id="btn-cancel-update" type="button" class="px-4 py-2 rounded border text-sm">Cancelar</button>
+            <div id="update-feedback" class="ml-auto text-sm text-slate-500"></div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="page-history" class="hidden">
+      <div class="mb-6 flex items-center justify-between">
+        <h2 class="text-2xl font-semibold">Histórico</h2>
+        <p class="text-sm text-slate-500">Agrupado por ATM → Caixa (mais recentes primeiro)</p>
+      </div>
+
+      <div id="history-list" class="space-y-6"></div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t py-4">
+    <div class="container mx-auto px-4 text-sm text-slate-500 text-center">
+      © 2025 Sequele Banks
     </div>
+  </footer>
 
-    <script>
-        // Mobile menu toggle
-        document.getElementById('menu-btn').addEventListener('click', function() {
-            const menu = document.getElementById('mobile-menu');
-            menu.classList.toggle('hidden');
+  <!-- LOGIN MODAL -->
+  <div id="modal-login" class="fixed inset-0 bg-black bg-opacity-40 modal-bg hidden z-50 flex items-center justify-center" aria-hidden="true">
+    <div class="bg-white rounded-lg shadow-2xl w-96 p-6" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <h3 id="login-title" class="text-lg font-semibold mb-3">Login</h3>
+      <input id="login-username" placeholder="Utilizador" class="w-full border rounded p-2 text-sm mb-2" aria-label="Utilizador"/>
+      <input id="login-password" type="password" placeholder="Senha" class="w-full border rounded p-2 text-sm mb-2" aria-label="Senha"/>
+      <p id="login-error" class="text-xs text-red-600 hidden">Utilizador ou senha inválidos</p>
+      <div class="flex items-center gap-3 mt-2">
+        <button id="login-submit" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">Entrar</button>
+        <button id="login-cancel" class="px-4 py-2 rounded border text-sm">Cancelar</button>
+        <!-- <div class="ml-auto text-xs text-slate-400">demo: <span class="font-medium">admin</span> / <span class="font-medium">segura123</span></div> -->
+      </div>
+      <div id="login-success" class="mt-2 p-2 rounded bg-green-50 text-sm text-green-700 hidden">Login feito com sucesso…</div>
+    </div>
+  </div>
+
+  <!-- MAP MODAL -->
+  <div id="modal-map" class="fixed inset-0 bg-black bg-opacity-40 modal-bg hidden z-50 flex items-center justify-center" aria-hidden="true">
+    <div class="bg-white rounded-lg shadow-2xl w-[94%] max-w-3xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-semibold text-slate-700">Localização</h4>
+        <div class="flex items-center gap-2">
+          <a id="open-in-gmaps" class="text-sm text-indigo-600 hover:underline" target="_blank" rel="noopener">Abrir no Google Maps</a>
+          <button id="map-close" class="px-3 py-1 rounded bg-red-500 text-white text-sm">Fechar</button>
+        </div>
+      </div>
+      <div id="map-container" class="h-80 rounded overflow-hidden"></div>
+    </div>
+  </div>
+
+  <!-- IMAGE LIGHTBOX -->
+  <div id="modal-image" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center" aria-hidden="true">
+    <div class="max-w-[90%] max-h-[90%]">
+      <img id="lightbox-img" src="" alt="foto" class="rounded shadow-lg max-h-[90vh] object-contain" />
+      <div class="mt-3 text-right">
+        <button id="image-close" class="px-3 py-1 rounded bg-white/10 text-white">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP SCRIPT -->
+  <script>
+    /* ========= DATA ========= */
+    const ATMS = [
+      { id: 'atm1', name: 'Banco Atlântico', coords: [-8.8383, 13.2344], machines: ['Caixa 1', 'Caixa 2']},
+      { id: 'atm2', name: 'Banco BAI', coords: [-8.8797157, 13.476563], machines: ['Caixa 1', 'Caixa 2']},
+      { id: 'atm3', name: 'Banco BFA', coords: [-8.8277, 13.2479], machines: ['Caixa 1', 'Caixa 2']},
+      { id: 'atm4', name: 'Banco BCI', coords: [-8.8797157, 13.476563], machines: ['Caixa 1', 'Caixa 2']},
+      { id: 'atm5', name: 'Banco BIC', coords: [-8.8355, 13.2230], machines: ['Caixa 1', 'Caixa 2']},
+      { id: 'atm6', name: 'Banco Sol', coords: [-8.8797157, 13.476563], machines: ['Caixa 1', 'Caixa 2','Caixa 3', 'Caixa 4', 'Caixa 5']}
+    ];
+
+    const STATUS = {
+      available: { label: 'Disponível', colorBg: 'bg-green-100', colorText: 'text-green-800', symbol: '✔️' },
+      out_of_cash: { label: 'Sem dinheiro', colorBg: 'bg-amber-100', colorText: 'text-amber-800', symbol: '⚠️' },
+      unavailable: { label: 'Indisponível', colorBg: 'bg-red-100', colorText: 'text-red-800', symbol: '❌' }
+    };
+
+    let auth = { logged: false, user: null };
+    let leafletMap = null;
+    let currentATM = null;
+
+    /* ========= HELPERS ========= */
+    function showToast(text, kind = 'info') {
+      const t = document.getElementById('toast');
+      t.textContent = text;
+      t.className = 'fixed top-6 right-6 z-50 px-4 py-2 rounded shadow text-white';
+      if (kind === 'success') t.classList.add('bg-green-600');
+      else if (kind === 'error') t.classList.add('bg-red-600');
+      else t.classList.add('bg-slate-800');
+      t.classList.remove('hidden');
+      clearTimeout(t._h);
+      t._h = setTimeout(() => t.classList.add('hidden'), 3200);
+    }
+
+    function fmt(ts) { return new Date(ts).toLocaleString(); }
+
+    function ensureStorage() {
+      ATMS.forEach(a => {
+        if (!localStorage.getItem(a.id)) {
+          const obj = { machines: {} };
+          a.machines.forEach(m => {
+            obj.machines[m] = { status: 'available', timestamp: Date.now(), history: [{ status: 'available', timestamp: Date.now(), photo: null, user: 'sistema' }] };
+          });
+          localStorage.setItem(a.id, JSON.stringify(obj));
+        } else {
+          // ensure structure contains all machines (if new machine added in code)
+          const data = JSON.parse(localStorage.getItem(a.id));
+          data.machines = data.machines || {};
+          a.machines.forEach(m => {
+            if (!data.machines[m]) {
+              data.machines[m] = { status: 'available', timestamp: Date.now(), history: [{ status: 'available', timestamp: Date.now(), photo: null, user: 'sistema' }] };
+            }
+          });
+          localStorage.setItem(a.id, JSON.stringify(data));
+        }
+      });
+    }
+
+    /* ========= RENDER HOME ========= */
+    function renderHome(filter = '') {
+      const list = document.getElementById('atm-list');
+      list.innerHTML = '';
+      const q = filter.trim().toLowerCase();
+      ATMS.forEach(a => {
+        const data = JSON.parse(localStorage.getItem(a.id));
+        // if filter, check ATM name or any machine name/status
+        if (q) {
+          const matchATM = a.name.toLowerCase().includes(q);
+          const matchMachine = a.machines.some(m => m.toLowerCase().includes(q) || (data.machines[m].status || '').toLowerCase().includes(q));
+          if (!matchATM && !matchMachine) return;
+        }
+
+        const card = document.createElement('article');
+        card.className = 'bg-white rounded-xl shadow p-5 flex flex-col justify-between h-auto';
+        // summary: show machine statuses
+        let machinesHTML = '';
+        a.machines.forEach(m => {
+          const d = data.machines[m];
+          const s = STATUS[d.status] || STATUS.available;
+          machinesHTML += `
+            <div class="flex items-center justify-between mt-2">
+              <div class="text-sm">${m}</div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${s.colorBg} ${s.colorText}">
+                <span class="text-sm">${s.symbol}</span>
+                <span>${s.label}</span>
+              </div>
+            </div>`;
         });
 
-        // Status selection
-        const statusOptions = document.querySelectorAll('.status-option');
-        const statusInput = document.getElementById('status-input');
-        
-        statusOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                // Remove active class from all options
-                statusOptions.forEach(opt => {
-                    opt.classList.remove('bg-blue-50', 'border-blue-300');
-                });
-                
-                // Add active class to clicked option
-                this.classList.add('bg-blue-50', 'border-blue-300');
-                
-                // Set the hidden input value
-                statusInput.value = this.dataset.status;
-            });
-        });
+        card.innerHTML = `
+          <div>
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-slate-800">${a.name}</h3>
+                <p class="text-xs text-slate-500 mt-1">Última atualização: <span class="font-medium">${latestTimestamp(data)}</span></p>
+              </div>
+              <div class="text-3xl select-none">🏧</div>
+            </div>
+            <div class="mt-3 h-auto">${machinesHTML}</div>
+          </div>
 
-        // Photo upload preview
-        const photoUpload = document.getElementById('photo-upload');
-        const photoPreview = document.getElementById('photo-preview');
-        
-        photoUpload.addEventListener('change', function(e) {
-            photoPreview.innerHTML = '';
-            photoPreview.classList.remove('hidden');
-            
-            Array.from(e.target.files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const previewDiv = document.createElement('div');
-                    previewDiv.className = 'photo-preview relative w-16 h-16 bg-gray-200 rounded overflow-hidden cursor-pointer';
-                    
-                    const img = document.createElement('img');
-                    img.src = event.target.result;
-                    img.className = 'w-full h-full object-cover';
-                    img.alt = 'Preview';
-                    
-                    const removeBtn = document.createElement('button');
-                    removeBtn.className = 'absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs';
-                    removeBtn.innerHTML = '×';
-                    removeBtn.addEventListener('click', function() {
-                        previewDiv.remove();
-                        if (photoPreview.children.length === 0) {
-                            photoPreview.classList.add('hidden');
-                        }
-                    });
-                    
-                    previewDiv.appendChild(img);
-                    previewDiv.appendChild(removeBtn);
-                    photoPreview.appendChild(previewDiv);
-                    
-                    // Add click event to show modal
-                    previewDiv.addEventListener('click', function() {
-                        const modal = document.getElementById('photo-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = event.target.result;
-                        modal.classList.remove('hidden');
-                    });
-                };
-                reader.readAsDataURL(file);
-            });
-        });
+          <div class="flex items-center justify-between mt-4">
+            <div class="flex gap-2">
+              <button data-id="${a.id}" class="btn-view inline-flex items-center gap-2 px-3 py-2 rounded border text-sm hover:bg-slate-50" aria-label="Ver detalhes de ${a.name}">Ver detalhes</button>
+              <button data-id="${a.id}" class="btn-map inline-flex items-center gap-2 px-3 py-2 rounded border text-sm hover:bg-slate-50" aria-label="Ver mapa de ${a.name}">Mapa</button>
+            </div>
+            <div class="text-sm text-slate-500"> </div>
+          </div>
+        `;
+        list.appendChild(card);
+      });
 
-        // Close modal
-        document.getElementById('close-modal').addEventListener('click', function() {
-            document.getElementById('photo-modal').classList.add('hidden');
-        });
+      // bind events
+      document.querySelectorAll('.btn-view').forEach(btn => btn.addEventListener('click', e => {
+        const id = e.currentTarget.dataset.id;
+        const atm = ATMS.find(x => x.id === id);
+        if (atm) openAtmDetail(atm);
+      }));
+      document.querySelectorAll('.btn-map').forEach(btn => btn.addEventListener('click', e => {
+        const id = e.currentTarget.dataset.id;
+        const atm = ATMS.find(x => x.id === id);
+        if (atm) openMapModal(atm);
+      }));
+    }
 
-        // Form submission
-        document.getElementById('report-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Simulate form submission
-            const notification = document.getElementById('success-notification');
-            notification.classList.remove('hidden');
-            
-            // Reset form
-            this.reset();
-            photoPreview.innerHTML = '';
-            photoPreview.classList.add('hidden');
-            statusOptions.forEach(opt => {
-                opt.classList.remove('bg-blue-50', 'border-blue-300');
-            });
-            statusInput.value = '';
-            
-            // Hide notification after 3 seconds
-            setTimeout(() => {
-                notification.classList.add('hidden');
-            }, 3000);
-        });
+    function latestTimestamp(data) {
+      // find last timestamp among machines
+      let last = 0;
+      Object.values(data.machines || {}).forEach(m => { if (m.timestamp && m.timestamp > last) last = m.timestamp; });
+      return last ? fmt(last) : '—';
+    }
 
-        // Simulate loading
-        setTimeout(() => {
-            const lastUpdate = document.getElementById('last-update');
-            lastUpdate.textContent = 'agora mesmo';
-            lastUpdate.classList.add('text-green-600', 'font-medium');
-        }, 1500);
-    </script>
+    /* ========= ATM DETAIL ========= */
+    function openAtmDetail(atm) {
+      currentATM = atm;
+      document.getElementById('page-home').classList.add('hidden');
+      document.getElementById('page-update').classList.add('hidden');
+      document.getElementById('page-history').classList.add('hidden');
+      document.getElementById('page-atm').classList.remove('hidden');
+
+      document.getElementById('atm-title').textContent = atm.name;
+      document.getElementById('atm-sub').textContent = `Coordenadas: ${atm.coords[0]}, ${atm.coords[1]}`;
+      document.getElementById('atm-open-gmaps').href = `https://www.google.com/maps?q=${atm.coords[0]},${atm.coords[1]}`;
+      renderMachines(atm);
+      populateQuickPanel(atm);
+    }
+
+    function renderMachines(atm) {
+      const container = document.getElementById('machines-list');
+      container.innerHTML = '';
+      const data = JSON.parse(localStorage.getItem(atm.id));
+      atm.machines.forEach(m => {
+        const d = data.machines[m];
+        const s = STATUS[d.status] || STATUS.available;
+        const item = document.createElement('div');
+        item.className = 'p-3 border rounded flex items-start justify-between gap-4';
+        item.innerHTML = `
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium">${m}</div>
+                <div class="text-xs text-slate-500 mt-1">Última: ${fmt(d.timestamp)}</div>
+              </div>
+              <div class="ml-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${s.colorBg} ${s.colorText}">
+                <span>${s.symbol}</span><span>${s.label}</span>
+              </div>
+            </div>
+
+            <div class="mt-3 text-sm text-slate-600 flex items-center gap-3">
+              <button class="btn-history-entry text-xs text-indigo-600 hover:underline">Ver histórico</button>
+              <button class="btn-view-photo text-xs text-indigo-600 hover:underline" ${d.history && d.history.length && d.history[d.history.length-1].photo ? '' : 'disabled'}>Ver última foto</button>
+              <button class="btn-open-map text-xs text-indigo-600 hover:underline">Ver localização</button>
+            </div>
+          </div>
+        `;
+        // events
+        item.querySelector('.btn-history-entry').addEventListener('click', () => {
+          // navigate to history and scroll to ATM & machine
+          showPage('history');
+          setTimeout(() => {
+            const el = document.querySelector(`[data-ref="${atm.id}__${cssSafe(m)}"]`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 80);
+        });
+        item.querySelector('.btn-view-photo').addEventListener('click', () => {
+          const last = (d.history || []).slice(-1)[0];
+          if (last && last.photo) openImageLightbox(last.photo);
+          else showToast('Sem foto disponível', 'info');
+        });
+        item.querySelector('.btn-open-map').addEventListener('click', () => openMapModal(atm));
+        container.appendChild(item);
+      });
+    }
+
+    function populateQuickPanel(atm) {
+      const sel = document.getElementById('quick-machine');
+      sel.innerHTML = '';
+      atm.machines.forEach(m => {
+        const opt = document.createElement('option'); opt.value = m; opt.textContent = m; sel.appendChild(opt);
+      });
+      document.getElementById('quick-feedback').textContent = '';
+    }
+
+    /* ========= MAP MODAL (Leaflet) ========= */
+    function openMapModal(atm) {
+      document.getElementById('modal-map').classList.remove('hidden');
+      document.getElementById('open-in-gmaps').href = `https://www.google.com/maps?q=${atm.coords[0]},${atm.coords[1]}`;
+      setTimeout(() => {
+        if (leafletMap) { leafletMap.remove(); leafletMap = null; document.getElementById('map-container').innerHTML = ''; }
+        leafletMap = L.map('map-container', { attributionControl: false }).setView(atm.coords, 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(leafletMap);
+        L.marker(atm.coords).addTo(leafletMap).bindPopup(`<strong>${atm.name}</strong>`).openPopup();
+      }, 80);
+    }
+    document.getElementById('map-close').addEventListener('click', () => {
+      document.getElementById('modal-map').classList.add('hidden');
+      if (leafletMap) { leafletMap.remove(); leafletMap = null; document.getElementById('map-container').innerHTML = ''; }
+    });
+
+    /* ========= IMAGE LIGHTBOX ========= */
+    function openImageLightbox(src) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('modal-image').classList.remove('hidden');
+    }
+    document.getElementById('image-close').addEventListener('click', () => {
+      document.getElementById('modal-image').classList.add('hidden');
+      document.getElementById('lightbox-img').src = '';
+    });
+    document.getElementById('modal-image').addEventListener('click', (e) => {
+      if (e.target.id === 'modal-image') { document.getElementById('modal-image').classList.add('hidden'); document.getElementById('lightbox-img').src = ''; }
+    });
+
+    /* ========= UPDATE PAGE ========= */
+    function fileToBase64(file) {
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+
+    function prepareUpdate() {
+      const sel = document.getElementById('select-atm');
+      sel.innerHTML = '';
+      ATMS.forEach(a => {
+        const opt = document.createElement('option'); opt.value = a.id; opt.textContent = a.name; sel.appendChild(opt);
+      });
+      fillMachinesForUpdate();
+      document.getElementById('update-feedback').textContent = '';
+      document.getElementById('input-photo').value = '';
+    }
+
+    function fillMachinesForUpdate() {
+      const atmId = document.getElementById('select-atm').value;
+      const atm = ATMS.find(x => x.id === atmId);
+      const selM = document.getElementById('select-machine');
+      selM.innerHTML = '';
+      atm.machines.forEach(m => {
+        const opt = document.createElement('option'); opt.value = m; opt.textContent = m; selM.appendChild(opt);
+      });
+    }
+    document.getElementById('select-atm').addEventListener('change', fillMachinesForUpdate);
+
+    document.getElementById('form-update').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!auth.logged) { openLoginModal(); return; }
+      const atmId = document.getElementById('select-atm').value;
+      const status = document.getElementById('select-status').value;
+      const machine = document.getElementById('select-machine').value;
+      const file = document.getElementById('input-photo').files[0];
+      let photo = null;
+      if (file) {
+        try { photo = await fileToBase64(file); } catch (err) { console.error(err); photo = null; }
+      }
+      const item = JSON.parse(localStorage.getItem(atmId));
+      item.machines[machine].status = status;
+      item.machines[machine].timestamp = Date.now();
+      item.machines[machine].history = item.machines[machine].history || [];
+      item.machines[machine].history.push({ status, timestamp: Date.now(), photo, user: auth.user || 'anónimo' });
+      localStorage.setItem(atmId, JSON.stringify(item));
+      document.getElementById('update-feedback').textContent = 'Atualização enviada ✔️';
+      showToast('Atualização salva', 'success');
+      setTimeout(() => {
+        showPage('home');
+        renderHome(document.getElementById('atm-search').value);
+      }, 700);
+    });
+
+    document.getElementById('btn-cancel-update').addEventListener('click', () => showPage('home'));
+
+    /* ========= HISTORY PAGE ========= */
+    function renderHistory() {
+      const container = document.getElementById('history-list');
+      container.innerHTML = '';
+      ATMS.forEach(a => {
+        const data = JSON.parse(localStorage.getItem(a.id));
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-xl shadow p-4';
+        let html = `<h3 class="font-semibold mb-3">${a.name}</h3>`;
+        a.machines.forEach(m => {
+          const d = data.machines[m];
+          html += `<div class="mb-3" data-ref="${a.id}__${cssSafe(m)}"><div class="font-medium">${m}</div>`;
+          (d.history || []).slice().reverse().forEach(h => {
+            const s = STATUS[h.status] || STATUS.available;
+            html += `<div class="flex items-center gap-3 text-sm border-t pt-2">
+                      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full ${s.colorBg} ${s.colorText}">${s.symbol} ${s.label}</div>
+                      <div class="text-xs text-slate-400">${fmt(h.timestamp)}</div>
+                      <div class="ml-auto"> ${h.user ? `<span class="text-xs text-slate-500 mr-2">por ${h.user}</span>` : ''} ${h.photo ? `<button class="btn-hist-photo text-xs text-indigo-600 hover:underline">Ver foto</button>` : ''}</div>
+                     </div>`;
+          });
+          html += `</div>`;
+        });
+        card.innerHTML = html;
+        container.appendChild(card);
+
+        // bind photo buttons
+        card.querySelectorAll('.btn-hist-photo').forEach((btn, i) => {
+          btn.addEventListener('click', (ev) => {
+            // find corresponding photo in reversed history: compute index
+            const all = [];
+            a.machines.forEach(mn => { (JSON.parse(localStorage.getItem(a.id)).machines[mn].history || []).slice().reverse().forEach(x=> all.push(x)); });
+            // compute global index based on position - easier: open last photo in that machine group
+            const parent = btn.closest('[data-ref]');
+            const [aid, ref] = parent.getAttribute('data-ref').split('__');
+            const machineName = decodeCssSafe(ref);
+            const hist = JSON.parse(localStorage.getItem(aid)).machines[machineName].history || [];
+            const last = hist.slice(-1)[0];
+            if (last && last.photo) openImageLightbox(last.photo);
+            else showToast('Sem foto disponível', 'info');
+          });
+        });
+      });
+    }
+
+    /* ========= NAVIGATION & LOGIN ========= */
+    function showPage(name) {
+      document.getElementById('page-home').classList.add('hidden');
+      document.getElementById('page-atm').classList.add('hidden');
+      document.getElementById('page-update').classList.add('hidden');
+      document.getElementById('page-history').classList.add('hidden');
+
+      if (name === 'home') { document.getElementById('page-home').classList.remove('hidden'); renderHome(document.getElementById('atm-search').value || ''); }
+      if (name === 'atm' && currentATM) { openAtmDetail(currentATM); }
+      if (name === 'update') { if (!auth.logged) { openLoginModal(); return; } document.getElementById('page-update').classList.remove('hidden'); prepareUpdate(); }
+      if (name === 'history') { if (!auth.logged) { openLoginModal(); return; } document.getElementById('page-history').classList.remove('hidden'); renderHistory(); }
+    }
+
+    document.getElementById('nav-home').addEventListener('click', () => showPage('home'));
+    document.getElementById('nav-update').addEventListener('click', () => showPage('update'));
+    document.getElementById('nav-history').addEventListener('click', () => showPage('history'));
+
+    // search controls
+    document.getElementById('atm-search').addEventListener('input', (e) => {
+      const v = e.target.value;
+      document.getElementById('atm-search-clear').classList.toggle('hidden', !v);
+      renderHome(v);
+    });
+    document.getElementById('atm-search-clear').addEventListener('click', () => {
+      document.getElementById('atm-search').value = '';
+      document.getElementById('atm-search-clear').classList.add('hidden');
+      renderHome('');
+    });
+
+    // ATM detail back
+    document.getElementById('atm-back').addEventListener('click', () => showPage('home'));
+
+    // quick update in ATM details
+    document.getElementById('quick-update').addEventListener('click', async () => {
+      if (!auth.logged) { openLoginModal(); return; }
+      const machine = document.getElementById('quick-machine').value;
+      const status = document.getElementById('quick-status').value;
+      const atm = currentATM;
+      const data = JSON.parse(localStorage.getItem(atm.id));
+      data.machines[machine].status = status;
+      data.machines[machine].timestamp = Date.now();
+      data.machines[machine].history.push({ status, timestamp: Date.now(), photo: null, user: auth.user });
+      localStorage.setItem(atm.id, JSON.stringify(data));
+      document.getElementById('quick-feedback').textContent = 'Atualizado ✔️';
+      showToast('Atualização salva', 'success');
+      renderMachines(atm);
+      setTimeout(()=>{ document.getElementById('quick-feedback').textContent = ''; }, 1400);
+    });
+    // document.getElementById('quick-refresh').addEventListener('click', () => renderMachines(currentATM));
+
+    // LOGIN modal
+    function openLoginModal() { document.getElementById('modal-login').classList.remove('hidden'); }
+    function closeLoginModal() {
+      document.getElementById('modal-login').classList.add('hidden');
+      document.getElementById('login-username').value = '';
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('login-success').classList.add('hidden');
+    }
+
+    document.getElementById('btn-login').addEventListener('click', openLoginModal);
+    document.getElementById('login-cancel').addEventListener('click', closeLoginModal);
+
+    document.getElementById('login-submit').addEventListener('click', () => {
+      const user = document.getElementById('login-username').value.trim();
+      const pass = document.getElementById('login-password').value;
+      if (user === 'admin' && pass === 'segura123') {
+        auth.logged = true; auth.user = user;
+        document.getElementById('login-success').classList.remove('hidden');
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('welcome').textContent = `Olá, ${user}`;
+        document.getElementById('welcome').classList.remove('hidden');
+        document.getElementById('btn-login').classList.add('hidden');
+        document.getElementById('btn-logout').classList.remove('hidden');
+        setTimeout(() => { closeLoginModal(); showToast('Login efetuado', 'success'); }, 700);
+      } else {
+        document.getElementById('login-error').classList.remove('hidden');
+        showToast('Credenciais inválidas', 'error');
+      }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      auth.logged = false; auth.user = null;
+      document.getElementById('welcome').classList.add('hidden');
+      document.getElementById('btn-login').classList.remove('hidden');
+      document.getElementById('btn-logout').classList.add('hidden');
+      showToast('Sessão encerrada', 'info');
+      showPage('home');
+    });
+
+    /* ========= UTIL & INIT ========= */
+    // small helpers to encode machine names as safe data-ref keys
+    function cssSafe(s) { return encodeURIComponent(s).replace(/%/g,'_'); }
+    function decodeCssSafe(s) { return decodeURIComponent(s.replace(/_/g,'%')); }
+
+    // initial setup
+    ensureStorage();
+    // default page
+    showPage('home');
+
+    // expose for debug if needed
+    window.__app = { renderHome, renderHistory, openAtmDetail, openMapModal };
+  </script>
 </body>
 </html>
