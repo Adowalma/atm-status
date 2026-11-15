@@ -56,7 +56,7 @@ export function Sheet({ labelledBy, onClose, maxWidth, z = 50, children }: { lab
   return (
     <div className="layer" style={{ zIndex: z }} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
       <div className="scrim" onClick={onClose} />
-      <div ref={ref} tabIndex={-1} className="sheet" style={{ maxWidth, maxHeight: '92vh' }}>
+      <div ref={ref} tabIndex={-1} className="sheet" style={{ maxWidth }}>
         <div className="grab" aria-hidden="true" />
         {children}
       </div>
