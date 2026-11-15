@@ -19,6 +19,8 @@ export function Quick({ k, atmId, initialCaixa, onClose, onOpenAtm, onAll, copie
   const [done, setDone] = useState<{ status: ReportStatus; targets: number[]; receipt: ReportReceipt } | null>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  // Switching between the form and the receipt: start the new view from the top.
+  useEffect(() => { ref.current?.scrollTo({ top: 0 }); }, [done === null]);
 
   const a = k.atms.find(x => x.id === atmId);
   if (!a) return null;
@@ -59,7 +61,7 @@ export function Quick({ k, atmId, initialCaixa, onClose, onOpenAtm, onAll, copie
         </div>
 
         {!done ? (
-          <div className="up" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div key="form" className="up" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span className="eyebrow">Estás no ATM</span>
               <h2 id="tkq" className="display" style={{ fontSize: 'clamp(32px,8vw,40px)', letterSpacing: '-.03em', lineHeight: 1.02 }}>{a.bank} · {a.name}</h2>
@@ -93,7 +95,7 @@ export function Quick({ k, atmId, initialCaixa, onClose, onOpenAtm, onAll, copie
             <span className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>Sem conta e sem formulário — o toque já envia. Podes desfazer a seguir.</span>
           </div>
         ) : (
-          <div className="up" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div key="done" className="up" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <AtmSymbol status={done.status} px={7} slit="var(--bg)" />
               <div role="status" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
