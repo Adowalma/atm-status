@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useDialog, useReveal } from '../lib/hooks';
-import { ST } from '../lib/status';
+import { ST, type StatusIcon } from '../lib/status';
 import type { StatusKey } from '../data/types';
 
 export function Logo({ size = 22 }: { size?: number }) {
@@ -13,19 +13,23 @@ export function Logo({ size = 22 }: { size?: number }) {
   );
 }
 
+/** Check / dash / cross / power glyph shared by the ATM mark and the hero scene. */
+export function StatusGlyph({ icon, stroke = '#111' }: { icon: Exclude<StatusIcon, 'q'>; stroke?: string }) {
+  const p = { viewBox: '0 0 24 24', fill: 'none', stroke, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  if (icon === 'check') return <svg {...p} strokeWidth="3.4"><polyline points="5,12.5 10,17.5 19,7" /></svg>;
+  if (icon === 'dash') return <svg {...p} strokeWidth="3.4"><line x1="6" y1="12" x2="18" y2="12" /></svg>;
+  if (icon === 'x') return <svg {...p} strokeWidth="3.4"><line x1="7" y1="7" x2="17" y2="17" /><line x1="17" y1="7" x2="7" y2="17" /></svg>;
+  return <svg {...p} strokeWidth="3.2"><path d="M12 4v7" /><path d="M7.5 7.5a6.5 6.5 0 1 0 9 0" /></svg>;
+}
+
 /** ATM mark; `px` is the em size (symbol is 9.6em wide). */
 export function AtmSymbol({ status, px, slit }: { status: StatusKey; px: number; slit?: string }) {
   const s = ST[status];
-  const p = { viewBox: '0 0 24 24', fill: 'none', stroke: '#111', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return (
     <div aria-hidden="true" className="sym" style={{ fontSize: px, ...(slit ? { ['--slit' as string]: slit } : {}) } as CSSProperties}>
       <div className="top"><div className="slit" /></div>
       <div className="scr" style={{ background: s.color }}>
-        {s.icon === 'check' && <svg {...p} strokeWidth="3.4"><polyline points="5,12.5 10,17.5 19,7" /></svg>}
-        {s.icon === 'dash' && <svg {...p} strokeWidth="3.4"><line x1="6" y1="12" x2="18" y2="12" /></svg>}
-        {s.icon === 'x' && <svg {...p} strokeWidth="3.4"><line x1="7" y1="7" x2="17" y2="17" /><line x1="17" y1="7" x2="7" y2="17" /></svg>}
-        {s.icon === 'power' && <svg {...p} strokeWidth="3.2"><path d="M12 4v7" /><path d="M7.5 7.5a6.5 6.5 0 1 0 9 0" /></svg>}
-        {s.icon === 'q' && <span className="qm">?</span>}
+        {s.icon === 'q' ? <span className="qm">?</span> : <StatusGlyph icon={s.icon} />}
       </div>
     </div>
   );

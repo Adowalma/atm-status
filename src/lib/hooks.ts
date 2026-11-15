@@ -39,6 +39,42 @@ export function useReveal<T extends HTMLElement>() {
   return [ref, on] as const;
 }
 
+/** True while the element is on screen (starts true so nothing waits for the first observer callback). */
+export function useInView<T extends Element>() {
+  const ref = useRef<T>(null);
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setOn(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return [ref, on] as const;
+}
+
+/** True while the tab is in the background. */
+export function usePageHidden() {
+  const [hidden, setHidden] = useState(() => document.hidden);
+  useEffect(() => {
+    const f = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', f);
+    return () => document.removeEventListener('visibilitychange', f);
+  }, []);
+  return hidden;
+}
+
+export function useReducedMotion() {
+  const [r, setR] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const mq = matchMedia('(prefers-reduced-motion: reduce)');
+    const f = () => setR(mq.matches);
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
+  return r;
+}
+
 export function useToast() {
   const [toast, setToast] = useState<string | null>(null);
   const t = useRef<number>();

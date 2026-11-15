@@ -1,8 +1,7 @@
 import type { Kumbu } from '../lib/useKumbu';
 import { summary } from '../lib/status';
-import { AtmSymbol, Reveal, Skel } from './ui';
-
-const LEGEND = [['unknown', 'Por confirmar'], ['tem', 'Tem kumbu'], ['pouco', 'Pouco kumbu'], ['sem', 'Sem kumbu']] as const;
+import { Reveal, Skel } from './ui';
+import { AtmScene } from './AtmScene';
 
 export function Hero({ k, onPick }: { k: Kumbu; onPick: () => void }) {
   const sums = k.atms.map(summary);
@@ -34,14 +33,7 @@ export function Hero({ k, onPick }: { k: Kumbu; onPick: () => void }) {
           )}
         </div>
       </div>
-      <div className="card hero-card">
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}><AtmSymbol status="tem" px={22} /></div>
-        <div className="legend">
-          {LEGEND.map(([s, label]) => (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}><AtmSymbol status={s} px={4} /><span style={{ fontSize: 14, lineHeight: 1.3 }}>{label}</span></div>
-          ))}
-        </div>
-      </div>
+      <div className="hero-scene"><AtmScene k={k} /></div>
     </Reveal>
   );
 }

@@ -26,7 +26,7 @@ h1,h2,h3,p{margin:0}
 @keyframes tkClean{0%{width:0}100%{width:100%}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
-.page{min-height:100vh}
+.page{min-height:100vh;overflow-x:clip}
 .wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,40px)}
 .mono{font-family:'Geist Mono',monospace}
 .display{font-family:'Bricolage Grotesque',sans-serif;font-weight:800}
@@ -118,8 +118,110 @@ h1,h2,h3,p{margin:0}
 .hero h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:clamp(38px,7vw,68px);line-height:1;letter-spacing:-.035em;text-wrap:balance}
 .hero p{font-size:clamp(16px,2vw,18px);line-height:1.55;color:var(--muted);max-width:480px;text-wrap:pretty}
 .stat b{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:30px;letter-spacing:-.02em}
-.hero-card{flex:1 1 300px;max-width:460px;padding:clamp(24px,4vw,40px);display:flex;flex-direction:column;gap:28px}
-.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+.hero-copy{position:relative;z-index:1}
+
+/* hero scene — one animated ATM. Everything in .stage is sized in em (1em = machine width / 54.6), so it scales as one piece. */
+@property --st-c{syntax:'<color>';inherits:true;initial-value:#44B864}
+@property --st-led{syntax:'<color>';inherits:true;initial-value:#44B864}
+@property --st-i{syntax:'<number>';inherits:true;initial-value:1}
+@keyframes tkBreath{from{opacity:.72}to{opacity:1}}
+@keyframes tkDust{0%{opacity:0;transform:translate(0,0)}20%{opacity:var(--a)}80%{opacity:var(--a)}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+@keyframes tkFloat{from{transform:translateY(0)}to{transform:translateY(-.3em)}}
+@keyframes tkLed{50%{opacity:.62}}
+@keyframes tkShake{0%,100%{transform:none}20%{transform:translateX(-.14em)}40%{transform:translateX(.14em)}60%{transform:translateX(-.09em)}80%{transform:translateX(.07em)}}
+
+.hero-scene{flex:1 1 400px;max-width:480px;min-width:0;margin-inline:auto}
+.scene{container-type:inline-size;position:relative;display:flex;flex-direction:column;gap:6px;transition:--st-c .8s ease,--st-led .8s ease,--st-i 1.6s ease;
+  --st-i:1;--halo:rgba(98,198,126,.035);--dot:rgba(190,235,205,.7);--sh:rgba(70,170,100,.05);--edge:rgba(255,255,255,.08);
+  --fc-bg:linear-gradient(135deg,rgba(66,70,67,.5),rgba(34,38,35,.4));--fc-ink:#f4f4f4;--fc-mute:rgba(255,255,255,.68);--fc-line:rgba(255,255,255,.08);--fc-hi:rgba(255,255,255,.06);--fc-sh:0 .8em 2em -1.4em rgba(0,0,0,.35)}
+[data-theme="light"] .scene{--halo:rgba(98,198,126,.025);--dot:rgba(28,118,54,.4);--sh:rgba(70,180,104,.04);--edge:rgba(0,0,0,.15);
+  --fc-bg:linear-gradient(135deg,rgba(255,255,255,.7),rgba(255,255,255,.5));--fc-ink:#141414;--fc-mute:#4a4a4a;--fc-line:rgba(0,0,0,.07);--fc-hi:rgba(255,255,255,.6);--fc-sh:0 .8em 2em -1.4em rgba(20,50,30,.16)}
+.scene[data-s="tem"]{--st-i:1}.scene[data-s="pouco"]{--st-i:.8}.scene[data-s="sem"]{--st-i:.6}.scene[data-s="fora"]{--st-i:.4}
+.scene[data-run="false"] .stage *{animation-play-state:paused!important}
+
+/* The stage is the machine (centred) plus the status card laid over its lower edge. The machine dissolves just above the card. */
+.stage{position:relative;--u:calc(100cqw*.72/54.6);font-size:var(--u);--F:clamp(12px,3.3cqw,16px);--top:calc(var(--u)*4);height:calc(var(--top) + 76em);pointer-events:none}
+
+/* A soft glow behind the machine, nothing more. Radial and fading to zero before its box ends, so it has no edge. */
+.halo{position:absolute;left:50%;top:calc(var(--top) + 38em);width:100em;height:96em;margin:-48em 0 0 -50em;opacity:var(--st-i)}
+.halo::after{content:'';position:absolute;inset:0;background:radial-gradient(closest-side,var(--halo) 0,color-mix(in srgb,var(--halo) 70%,transparent) 22%,color-mix(in srgb,var(--halo) 38%,transparent) 45%,color-mix(in srgb,var(--halo) 14%,transparent) 70%,color-mix(in srgb,var(--halo) 3%,transparent) 90%,transparent);animation:tkBreath 8s ease-in-out infinite alternate}
+/* Specks rise slowly. The layer reaches well above the stage (and a little past its sides) so they drift up beneath the sticky header, which is opaque and above them. */
+.dust{position:absolute;inset:-34em -14em 0 -14em}
+.dust i{position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);border-radius:50%;background:var(--dot);opacity:0;animation:tkDust var(--t) linear var(--dl) infinite}
+
+/* machine */
+.atm{position:absolute;left:50%;margin-left:-27.3em;top:var(--top);width:54.6em;height:78em}
+/* the only green: a faint aura around the machine that fades out downwards. Nothing glows on top of the machine or the notes. */
+.atm-sh{position:absolute;inset:3em -2.5em 14em -2.5em;border-radius:5em;background:var(--sh);filter:blur(8em);-webkit-mask-image:linear-gradient(#000 20%,transparent 80%);mask-image:linear-gradient(#000 20%,transparent 80%)}
+.atm-in{position:absolute;inset:0;border-radius:3.2em 3.2em 0 0;background:linear-gradient(90deg,#9e9e99 0,#f1f1ed 6%,#fafaf6 22%,#e5e5e0 56%,#cbcbc6 84%,#eaeae5 95%,#a6a6a1 100%);box-shadow:inset 0 0 0 1px var(--edge),inset 0 .3em 0 rgba(255,255,255,.7);-webkit-mask-image:linear-gradient(#000 60%,transparent 97%);mask-image:linear-gradient(#000 60%,transparent 97%)}
+.atm-top{position:absolute;left:2.8em;top:2em;width:49em;height:7.2em;border-radius:1em 1em .5em .5em;background:linear-gradient(#1c1c1c,#111);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.atm-badge{position:absolute;left:50%;margin-left:-5em;top:1.5em;width:10em;height:4.2em;display:grid;place-items:center;border-radius:.5em;background:#5CC379}
+.atm-badge b{font:800 2.4em/1 'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;color:#111}
+.atm-body{position:absolute;left:4em;top:11.2em;width:46.6em;bottom:0;overflow:hidden;border-radius:1.7em 1.7em 0 0;background:linear-gradient(180deg,#2a2a2a,#1d1d1d);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),inset 0 .6em 2em rgba(0,0,0,.35)}
+.scrframe{position:absolute;left:3.5em;top:4.1em;width:39.6em;height:28.1em;padding:1.25em;border-radius:1.3em;background:#070707;box-shadow:0 0 0 .15em #161616}
+.screen{position:relative;width:100%;height:100%;border-radius:.5em;overflow:hidden;background:#0c0c0c}
+.reader{position:absolute;left:4.3em;top:35.4em;width:10.1em;height:5.6em;border-radius:.9em;background:#121212;box-shadow:inset 0 .2em .7em #000}
+.led{position:absolute;left:1.7em;top:2.5em;width:6.8em;height:.55em;border-radius:.3em;background:var(--st-led);box-shadow:0 0 .5em color-mix(in srgb,var(--st-led) 60%,transparent);animation:tkLed 3.2s ease-in-out infinite}
+.disp{position:absolute;inset:0}
+.scene[data-s="tem"] .disp,.scene[data-s="tem"] .chute{animation:tkShake .5s ease-in-out 1s 2}
+.tray{position:absolute;left:6.3em;top:44.6em;width:34em;height:4.8em;border-radius:1.1em;background:linear-gradient(#313131,#262626);box-shadow:inset 0 .1em 0 rgba(255,255,255,.07)}
+.slot{position:absolute;left:2.3em;top:1.8em;width:29.4em;height:1.3em;border-radius:.65em;background:#050505;transition:box-shadow .8s ease}
+.chute{position:absolute;left:14.7em;top:58.25em;width:25.2em;height:19em;overflow:hidden}
+.note{position:absolute;left:0;top:0;width:100%;height:15.8em;display:grid;place-items:center;transform:translateY(-104%);transition:transform .9s cubic-bezier(.5,0,.8,.45);background:linear-gradient(180deg,#68d083,#58bd73);box-shadow:inset 0 -.4em .8em rgba(0,60,20,.18)}
+.note::before{content:'';position:absolute;inset:1em;border:.3em solid rgba(16,86,38,.32)}
+.note b{position:relative;font:800 4.6em/1 'Bricolage Grotesque',sans-serif;letter-spacing:-.04em;color:#10391e}
+.nb{left:.7em;width:calc(100% - .7em);background:linear-gradient(180deg,#52b46d,#46a061);rotate:1.1deg;transition-delay:.05s}
+.scene[data-s="tem"] .note{transform:none;transition:transform 1.8s cubic-bezier(.3,1.3,.45,1) 1.05s}
+.scene[data-s="tem"] .nb{transform:translateY(-6%);transition-delay:1.18s}
+
+/* screen layers: the incoming one fades in on top, the outgoing one is dropped once it is covered */
+.lay{position:absolute;inset:0;display:flex;align-items:center;padding:0 2.3em;opacity:0;z-index:0;transition:opacity 0s linear .8s}
+.lay[data-on="true"]{opacity:1;z-index:1;transition:opacity .8s ease}
+.lay .in{width:100%;transform:translateY(1em);transition:transform .9s cubic-bezier(.2,.7,.2,1)}
+.lay .in.row{display:flex;align-items:center;gap:2em}
+.lay[data-on="true"] .in{transform:none;transition-delay:.15s}
+.lay-tem{background:radial-gradient(ellipse at 15% 0,rgba(98,198,126,.12),transparent 60%),linear-gradient(160deg,#252c28,#111614)}
+.lay-pouco{background:radial-gradient(ellipse at 15% 0,rgba(232,165,58,.16),transparent 60%),linear-gradient(160deg,#322a1b,#1a140c)}
+.lay-sem{background:radial-gradient(ellipse at 15% 0,rgba(226,88,63,.14),transparent 60%),linear-gradient(160deg,#2d1a18,#190e0d)}
+.lay-fora{background:linear-gradient(160deg,#c23b30,#941d17)}
+.lay-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:.9em}
+.lay-h{font:800 max(3.6em,13px)/1.05 'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;color:#fff}
+.lay-t{font:600 max(2.2em,9px)/1.1 'Geist',sans-serif;text-transform:uppercase}
+.lay-p{font:400 max(1.7em,9.5px)/1.3 'Geist',sans-serif;color:rgba(255,255,255,.78)}
+.lay-pouco .lay-t{color:#f2b24d}.lay-sem .lay-t{color:#f0674f}.lay-fora .lay-t{color:#fff}
+.lay-ic{flex:none;width:9.1em;height:9.1em;border-radius:1.3em;display:grid;place-items:center}
+.lay-ic svg{width:4.3em;height:4.3em}
+.lay-pouco .lay-ic{background:rgba(255,255,255,.08);color:#f2b24d}
+.lay-sem .lay-ic{background:rgba(255,255,255,.08);color:#f0674f}
+.lay-fora .lay-ic{background:#fff;color:#cf2f25}
+.glare{position:absolute;inset:0;pointer-events:none;background:linear-gradient(118deg,rgba(255,255,255,.08),transparent 38%)}
+
+/* status card: centred under the machine, its border carries the state colour */
+.fcw{position:absolute;inset:0}
+.fc{position:absolute;font-size:var(--F);display:flex;align-items:center;gap:.9em;width:max-content;max-width:min(17.5em,57cqw);height:3.8em;padding:0 .75em 0 .95em;border-radius:1.25em;color:var(--fc-ink);background:var(--fc-bg);
+  box-shadow:inset 0 0 0 1px var(--fc-line),inset 0 .08em 0 var(--fc-hi),var(--fc-sh);-webkit-backdrop-filter:blur(9px) saturate(1.15);backdrop-filter:blur(9px) saturate(1.15);animation:tkFade .9s ease var(--d,.4s) backwards,tkFloat var(--fl,6s) ease-in-out var(--fd,0s) infinite alternate}
+/* zig-zag over the machine's edges (right above the screen, left beside it, right below it). Tops are in machine units (--u). */
+.fc-b{right:0;top:calc(var(--top) + var(--u)*8.6);--d:.4s;--fl:7s;--fd:-2s}
+.fc-a{right:79cqw;top:calc(var(--top) + var(--u)*25);--d:.55s;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--st-c) 40%,transparent),inset 0 .08em 0 var(--fc-hi),var(--fc-sh)}
+.fc-c{right:0;top:calc(var(--top) + var(--u)*45.3);--d:.7s;--fl:6.5s;--fd:-4s}
+.fc-tx{flex:1;min-width:0;display:grid}
+.fc-tx b{display:block;font:600 1em/1.2 'Geist',sans-serif;letter-spacing:-.01em;white-space:nowrap}
+.fc-tx span{display:block;margin-top:.15em;font:400 .85em/1.3 'Geist',sans-serif;color:var(--fc-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-chip{flex:none;display:grid;place-items:center;min-width:2.4em;height:2.4em;padding:0 .5em;border-radius:.5em;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fc-ink) 40%,transparent);font:600 .85em/1 'Geist',sans-serif}
+.fc-chip.mono{font-family:'Geist Mono',monospace;font-size:.8em}
+.fc-v{grid-area:1/1;min-width:0;opacity:0;transform:translateY(.35em);transition:opacity .45s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
+.fc-v[data-on="true"]{opacity:1;transform:none;transition-delay:.18s}
+.fc-ic{flex:none;display:grid;width:2.4em;height:2.4em;border-radius:.55em;background:color-mix(in srgb,var(--st-c) 82%,#fff)}
+.fc-ic .g{grid-area:1/1;display:grid;place-items:center;opacity:0;transform:scale(.5) rotate(-25deg);transition:opacity .35s ease,transform .5s cubic-bezier(.2,.9,.3,1.3)}
+.fc-ic .g[data-on="true"]{opacity:1;transform:none;transition-delay:.18s}
+.fc-ic svg{width:1.45em;height:1.45em}
+
+/* narrow scenes: a bigger machine so the screen text stays readable */
+@container (max-width:519px){
+  .stage{--u:calc(100cqw*.74/54.6);--F:clamp(12px,3.7cqw,15px)}
+}
+
+@media (max-width:640px){.fc-a{right:auto;left:0}}
 
 /* skeleton */
 .sk{display:block;border-radius:3px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel2) 50%,var(--skel) 75%);background-size:200% 100%;animation:tkShimmer 1.4s ease-in-out infinite}

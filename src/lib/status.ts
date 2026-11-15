@@ -1,6 +1,8 @@
 import type { Atm, StatusKey } from '../data/types';
 
-export const ST: Record<StatusKey, { label: string; color: string; dot: string; icon: 'check' | 'dash' | 'x' | 'power' | 'q' }> = {
+export type StatusIcon = 'check' | 'dash' | 'x' | 'power' | 'q';
+
+export const ST: Record<StatusKey, { label: string; color: string; dot: string; icon: StatusIcon }> = {
   tem: { label: 'Tem kumbu', color: '#44B864', dot: '#44B864', icon: 'check' },
   pouco: { label: 'Pouco kumbu', color: '#E8A53A', dot: '#E8A53A', icon: 'dash' },
   sem: { label: 'Sem kumbu', color: '#E2583F', dot: '#E2583F', icon: 'x' },
